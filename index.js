@@ -99,18 +99,27 @@ app.post('/create-identifier', async (req, res) => {
 // 🟢 تعبئة رصيد
 app.post('/recharge', async (req, res) => {
   const { phone, amount } = req.body;
-  if (amount <= 0) return res.status(400).json({ error: 'المبلغ غير صالح' });
+
+  const numericAmount = Number(amount);
+  if (!phone || isNaN(numericAmount) || numericAmount <= 0)
+    return res.status(400).json({ error: 'البيانات غير صالحة' });
+
   try {
     const result = await pool.query('SELECT * FROM users WHERE phone = $1', [phone]);
-    if (result.rows.length === 0) return res.status(404).json({ error: 'المستخدم غير موجود' });
+    if (result.rows.length === 0)
+      return res.status(404).json({ error: 'المستخدم غير موجود' });
 
-    const newBalance = result.rows[0].balance + amount;
+    const currentBalance = Number(result.rows[0].balance) || 0;
+    const newBalance = currentBalance + numericAmount;
+
     await pool.query('UPDATE users SET balance = $1 WHERE phone = $2', [newBalance, phone]);
+
     res.json({ status: 'success', message: 'تمت التعبئة بنجاح', new_balance: newBalance });
   } catch (err) {
     res.status(500).json({ error: 'فشل تحديث الرصيد' });
   }
 });
+
 
 // 🟢 تحديث الرمز التعريفي
 app.post('/update-identifier', async (req, res) => {
