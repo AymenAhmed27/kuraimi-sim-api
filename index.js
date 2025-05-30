@@ -124,14 +124,24 @@ app.post('/recharge', async (req, res) => {
 // 🟢 تحديث الرمز التعريفي
 app.post('/update-identifier', async (req, res) => {
   const { phone, identifier } = req.body;
+
   try {
-    const result = await pool.query('UPDATE users SET identifier = $1 WHERE phone = $2', [identifier, phone]);
-    if (result.rowCount === 0) return res.status(404).json({ error: 'المستخدم غير موجود' });
+    const userResult = await pool.query('SELECT identifier FROM users WHERE phone = $1', [phone]);
+    if (userResult.rows.length === 0) return res.status(404).json({ error: 'المستخدم غير موجود' });
+
+    const currentIdentifier = userResult.rows[0].identifier;
+    if (currentIdentifier === identifier) {
+      return res.json({ status: 'nochange', message: 'الرمز مطابق للرمز السابق، لم يتم التحديث' });
+    }
+
+    await pool.query('UPDATE users SET identifier = $1 WHERE phone = $2', [identifier, phone]);
     res.json({ status: 'success', message: 'تم تحديث الرمز التعريفي بنجاح' });
+
   } catch (err) {
     res.status(500).json({ error: 'فشل التحديث' });
   }
 });
+
 
 // 🟢 تفعيل أو إلغاء تفعيل EduPay
 app.post('/toggle-edupay', async (req, res) => {
