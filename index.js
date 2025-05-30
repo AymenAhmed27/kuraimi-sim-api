@@ -165,22 +165,37 @@ app.post('/toggle-edupay', async (req, res) => {
 
 // 🟢 خصم رصيد
 app.post('/charge', async (req, res) => {
-  const { identifier, amount } = req.body;
-  if (amount <= 0) return res.status(400).json({ status: 'error', message: 'المبلغ غير صالح' });
+  const { identifier, amount, student_phone } = req.body;
+
+  if (!identifier || !student_phone || amount <= 0) {
+    return res.status(400).json({ status: 'error', message: 'البيانات غير مكتملة أو غير صالحة' });
+  }
 
   try {
     const result = await pool.query('SELECT * FROM users WHERE identifier = $1', [identifier]);
-    if (result.rows.length === 0) return res.status(404).json({ status: 'error', message: 'المستخدم غير موجود' });
+
+    if (result.rows.length === 0)
+      return res.status(404).json({ status: 'error', message: 'الرمز غير مسجل' });
 
     const user = result.rows[0];
-    if (user.edupay_activated !== 1) return res.status(403).json({ status: 'error', message: 'يجب تفعيل EduPay أولاً' });
-    if (user.balance < amount) return res.status(400).json({ status: 'error', message: 'الرصيد غير كافٍ' });
+
+    if (user.edupay_activated !== 1)
+      return res.status(403).json({ status: 'error', message: 'يجب تفعيل EduPay أولاً' });
+
+    if (user.edupaynumber !== student_phone)
+      return res.status(403).json({ status: 'error', message: 'رقم الهاتف غير مطابق للرقم المفعل به EduPay' });
+
+    if (user.balance < amount)
+      return res.status(400).json({ status: 'error', message: 'الرصيد غير كافٍ' });
 
     const newBalance = user.balance - amount;
     await pool.query('UPDATE users SET balance = $1 WHERE id = $2', [newBalance, user.id]);
 
     const timestamp = new Date().toISOString();
-    await pool.query('INSERT INTO logs (user_id, amount, timestamp) VALUES ($1, $2, $3)', [user.id, amount, timestamp]);
+    await pool.query(
+      'INSERT INTO logs (user_id, amount, timestamp) VALUES ($1, $2, $3)',
+      [user.id, amount, timestamp]
+    );
 
     res.json({
       status: 'success',
@@ -191,10 +206,13 @@ app.post('/charge', async (req, res) => {
       remaining_balance: newBalance,
       timestamp
     });
+
   } catch (err) {
-    res.status(500).json({ status: 'error', message: 'خطأ في الخصم' });
+    console.error(err.message);
+    res.status(500).json({ status: 'error', message: 'خطأ داخلي في الخادم' });
   }
 });
+
 
 // 🟢 عرض كل المستخدمين
 app.get('/users', async (req, res) => {
