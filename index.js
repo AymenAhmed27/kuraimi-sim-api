@@ -27,7 +27,7 @@ const pool = new Pool({
         identifier TEXT UNIQUE,
         balance REAL DEFAULT 0,
         edupay_activated INTEGER DEFAULT 0,
-        edupaynamber TEXT
+        edupaynumber TEXT
       );
 
       CREATE TABLE IF NOT EXISTS logs (
@@ -110,9 +110,7 @@ app.post('/recharge', async (req, res) => {
     if (result.rows.length === 0)
       return res.status(404).json({ error: 'المستخدم غير موجود' });
 
-    const currentBalance = Number(result.rows[0].balance) || 0;
-    const newBalance = currentBalance + numericAmount;
-
+    const newBalance = Number(result.rows[0].balance || 0) + numericAmount;
     await pool.query('UPDATE users SET balance = $1 WHERE phone = $2', [newBalance, phone]);
 
     res.json({ status: 'success', message: 'تمت التعبئة بنجاح', new_balance: newBalance });
@@ -126,35 +124,31 @@ app.post('/update-identifier', async (req, res) => {
   const { phone, identifier } = req.body;
 
   try {
-    const userResult = await pool.query('SELECT identifier FROM users WHERE phone = $1', [phone]);
-    if (userResult.rows.length === 0) return res.status(404).json({ error: 'المستخدم غير موجود' });
+    const result = await pool.query('SELECT identifier FROM users WHERE phone = $1', [phone]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'المستخدم غير موجود' });
 
-    const currentIdentifier = userResult.rows[0].identifier;
-    if (currentIdentifier === identifier) {
+    if (result.rows[0].identifier === identifier) {
       return res.json({ status: 'nochange', message: 'الرمز مطابق للرمز السابق، لم يتم التحديث' });
     }
 
     await pool.query('UPDATE users SET identifier = $1 WHERE phone = $2', [identifier, phone]);
     res.json({ status: 'success', message: 'تم تحديث الرمز التعريفي بنجاح' });
-
   } catch (err) {
     res.status(500).json({ error: 'فشل التحديث' });
   }
 });
 
-// 🟢 تفعيل أو إلغاء تفعيل EduPay
-// 🟢 تفعيل أو إلغاء تفعيل EduPay (مع دعم edupaynamber)
+// 🟢 تفعيل أو إلغاء تفعيل EduPay مع رقم
 app.post('/toggle-edupay', async (req, res) => {
-  const { phone, edupaynamber } = req.body;
+  const { phone, edupaynumber } = req.body;
   try {
     const result = await pool.query('SELECT edupay_activated FROM users WHERE phone = $1', [phone]);
     if (result.rows.length === 0) return res.status(404).json({ error: 'المستخدم غير موجود' });
 
     const newStatus = result.rows[0].edupay_activated === 1 ? 0 : 1;
 
-    // التحديث مع أو بدون edupaynamber حسب الحالة
-    if (newStatus === 1 && edupaynamber) {
-      await pool.query('UPDATE users SET edupay_activated = $1, edupaynamber = $2 WHERE phone = $3', [newStatus, edupaynamber, phone]);
+    if (newStatus === 1 && edupaynumber) {
+      await pool.query('UPDATE users SET edupay_activated = $1, edupaynumber = $2 WHERE phone = $3', [newStatus, edupaynumber, phone]);
     } else {
       await pool.query('UPDATE users SET edupay_activated = $1 WHERE phone = $2', [newStatus, phone]);
     }
@@ -169,8 +163,7 @@ app.post('/toggle-edupay', async (req, res) => {
   }
 });
 
-
-// 🟢 خصم رصيد بناءً على الرمز التعريفي
+// 🟢 خصم رصيد
 app.post('/charge', async (req, res) => {
   const { identifier, amount } = req.body;
   if (amount <= 0) return res.status(400).json({ status: 'error', message: 'المبلغ غير صالح' });
@@ -180,11 +173,8 @@ app.post('/charge', async (req, res) => {
     if (result.rows.length === 0) return res.status(404).json({ status: 'error', message: 'المستخدم غير موجود' });
 
     const user = result.rows[0];
-    if (user.edupay_activated !== 1)
-      return res.status(403).json({ status: 'error', message: 'يجب تفعيل EduPay أولاً' });
-
-    if (user.balance < amount)
-      return res.status(400).json({ status: 'error', message: 'الرصيد غير كافٍ' });
+    if (user.edupay_activated !== 1) return res.status(403).json({ status: 'error', message: 'يجب تفعيل EduPay أولاً' });
+    if (user.balance < amount) return res.status(400).json({ status: 'error', message: 'الرصيد غير كافٍ' });
 
     const newBalance = user.balance - amount;
     await pool.query('UPDATE users SET balance = $1 WHERE id = $2', [newBalance, user.id]);
@@ -206,7 +196,7 @@ app.post('/charge', async (req, res) => {
   }
 });
 
-// 🟢 عرض جميع المستخدمين (اختياري)
+// 🟢 عرض كل المستخدمين
 app.get('/users', async (req, res) => {
   try {
     const result = await pool.query('SELECT * FROM users');
@@ -216,7 +206,7 @@ app.get('/users', async (req, res) => {
   }
 });
 
-// تشغيل الخادم
+// 🟢 تشغيل الخادم
 app.listen(port, () => {
   console.log(`✅ Mock Kuraimi API running on port ${port}`);
 });
