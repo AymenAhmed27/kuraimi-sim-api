@@ -143,29 +143,20 @@ app.post('/update-identifier', async (req, res) => {
 });
 
 // 🟢 تفعيل أو إلغاء تفعيل EduPay
+// 🟢 تفعيل أو إلغاء تفعيل EduPay (مع دعم edupaynamber)
 app.post('/toggle-edupay', async (req, res) => {
   const { phone, edupaynamber } = req.body;
   try {
-    const userResult = await pool.query('SELECT edupay_activated FROM users WHERE phone = $1', [phone]);
-    if (userResult.rows.length === 0) return res.status(404).json({ error: 'المستخدم غير موجود' });
+    const result = await pool.query('SELECT edupay_activated FROM users WHERE phone = $1', [phone]);
+    if (result.rows.length === 0) return res.status(404).json({ error: 'المستخدم غير موجود' });
 
-    const currentStatus = userResult.rows[0].edupay_activated;
-    const newStatus = currentStatus === 1 ? 0 : 1;
+    const newStatus = result.rows[0].edupay_activated === 1 ? 0 : 1;
 
-    if (newStatus === 1) {
-      if (!edupaynamber || edupaynamber.trim() === '') {
-        return res.status(400).json({ error: 'يرجى إدخال رقم الهاتف لتفعيل EduPay' });
-      }
-
-      await pool.query(
-        'UPDATE users SET edupay_activated = $1, edupaynamber = $2 WHERE phone = $3',
-        [newStatus, edupaynamber, phone]
-      );
+    // التحديث مع أو بدون edupaynamber حسب الحالة
+    if (newStatus === 1 && edupaynamber) {
+      await pool.query('UPDATE users SET edupay_activated = $1, edupaynamber = $2 WHERE phone = $3', [newStatus, edupaynamber, phone]);
     } else {
-      await pool.query(
-        'UPDATE users SET edupay_activated = $1 WHERE phone = $2',
-        [newStatus, phone]
-      );
+      await pool.query('UPDATE users SET edupay_activated = $1 WHERE phone = $2', [newStatus, phone]);
     }
 
     res.json({
@@ -177,6 +168,7 @@ app.post('/toggle-edupay', async (req, res) => {
     res.status(500).json({ error: 'فشل التحديث' });
   }
 });
+
 
 // 🟢 خصم رصيد بناءً على الرمز التعريفي
 app.post('/charge', async (req, res) => {
