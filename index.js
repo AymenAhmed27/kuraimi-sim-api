@@ -26,7 +26,8 @@ const pool = new Pool({
         phone TEXT UNIQUE NOT NULL,
         identifier TEXT UNIQUE,
         balance REAL DEFAULT 0,
-        edupay_activated INTEGER DEFAULT 0
+        edupay_activated INTEGER DEFAULT 0,
+        edupaynamber TEXT
       );
 
       CREATE TABLE IF NOT EXISTS logs (
@@ -120,7 +121,6 @@ app.post('/recharge', async (req, res) => {
   }
 });
 
-
 // 🟢 تحديث الرمز التعريفي
 app.post('/update-identifier', async (req, res) => {
   const { phone, identifier } = req.body;
@@ -142,16 +142,31 @@ app.post('/update-identifier', async (req, res) => {
   }
 });
 
-
 // 🟢 تفعيل أو إلغاء تفعيل EduPay
 app.post('/toggle-edupay', async (req, res) => {
-  const { phone } = req.body;
+  const { phone, edupaynamber } = req.body;
   try {
-    const result = await pool.query('SELECT edupay_activated FROM users WHERE phone = $1', [phone]);
-    if (result.rows.length === 0) return res.status(404).json({ error: 'المستخدم غير موجود' });
+    const userResult = await pool.query('SELECT edupay_activated FROM users WHERE phone = $1', [phone]);
+    if (userResult.rows.length === 0) return res.status(404).json({ error: 'المستخدم غير موجود' });
 
-    const newStatus = result.rows[0].edupay_activated === 1 ? 0 : 1;
-    await pool.query('UPDATE users SET edupay_activated = $1 WHERE phone = $2', [newStatus, phone]);
+    const currentStatus = userResult.rows[0].edupay_activated;
+    const newStatus = currentStatus === 1 ? 0 : 1;
+
+    if (newStatus === 1) {
+      if (!edupaynamber || edupaynamber.trim() === '') {
+        return res.status(400).json({ error: 'يرجى إدخال رقم الهاتف لتفعيل EduPay' });
+      }
+
+      await pool.query(
+        'UPDATE users SET edupay_activated = $1, edupaynamber = $2 WHERE phone = $3',
+        [newStatus, edupaynamber, phone]
+      );
+    } else {
+      await pool.query(
+        'UPDATE users SET edupay_activated = $1 WHERE phone = $2',
+        [newStatus, phone]
+      );
+    }
 
     res.json({
       status: 'success',
