@@ -2,6 +2,11 @@ const express = require('express');
 const { Pool } = require('pg');
 const bodyParser = require('body-parser');
 
+// IPv4 force workaround for Supabase on Render
+const dns = require('dns');
+dns.setDefaultResultOrder('ipv4first');
+
+
 const app = express();
 const port = process.env.PORT || 3000;
 
