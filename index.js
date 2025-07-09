@@ -10,7 +10,7 @@ app.use(bodyParser.json());
 // الاتصال بـ Supabase PostgreSQL
 const pool = new Pool({
   user: 'postgres',
-  password: '@ymen2002',
+  password: '@reej714069727',
   host: 'db.hhqvppproztfgtlwwsxe.supabase.co',
   port: 5432,
   database: 'postgres',
