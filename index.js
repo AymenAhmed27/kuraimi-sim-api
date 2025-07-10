@@ -6,20 +6,15 @@ const app = express();
 const port = process.env.PORT || 3000;
 app.use(bodyParser.json());
 
-// إعداد الاتصال بقاعدة البيانات
+// إعداد الاتصال بقاعدة البيانات (Neon)
 const pool = new Pool({
-  user: 'postgres',
-  password: 'GNWkTYRADqWZLnDbsJJAWKFYTVjIqKSM',
-  host: 'postgres.railway.internal',
-  port: 5432,
-  database: 'railway',
-  ssl: { rejectUnauthorized: false }
+  connectionString: 'postgresql://neondb_owner:npg_OR9T8AcWPmDh@ep-snowy-wave-a2cvo4j8-pooler.eu-central-1.aws.neon.tech/neondb?sslmode=require&channel_binding=require'
 });
 
 // إنشاء الجداول وإضافة بيانات أولية
 (async () => {
   try {
-    await pool.query(
+    await pool.query(\`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
         name TEXT NOT NULL,
@@ -36,15 +31,15 @@ const pool = new Pool({
         amount REAL,
         timestamp TEXT
       );
-    );
+    \`);
 
     const result = await pool.query('SELECT COUNT(*) FROM users');
     if (parseInt(result.rows[0].count) === 0) {
-      await pool.query(
+      await pool.query(\`
         INSERT INTO users (name, phone, identifier, balance, edupay_activated) VALUES
         ('علي ناصر', '714069727', '2002', 1500, 1),
         ('ريم سالم', '733112233', '2005', 900, 0)
-      );
+      \`);
     }
 
     console.log("✅ Database initialized and seed data inserted.");
@@ -200,7 +195,7 @@ app.post('/charge', async (req, res) => {
     res.json({
       status: 'success',
       message: 'تم الخصم بنجاح',
-      receipt_id: MOCK-${Date.now()},
+      receipt_id: \`MOCK-\${Date.now()}\`,
       name: user.name,
       amount,
       remaining_balance: newBalance,
@@ -212,7 +207,6 @@ app.post('/charge', async (req, res) => {
     res.status(500).json({ status: 'error', message: 'خطأ داخلي في الخادم' });
   }
 });
-
 
 // 🟢 عرض كل المستخدمين
 app.get('/users', async (req, res) => {
@@ -226,8 +220,5 @@ app.get('/users', async (req, res) => {
 
 // 🟢 تشغيل الخادم
 app.listen(port, () => {
-  console.log(✅ Mock Kuraimi API running on port ${port});
+  console.log(\`✅ Mock Kuraimi API running on port \${port}\`);
 });
-
-
-
